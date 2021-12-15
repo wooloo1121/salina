@@ -25,7 +25,7 @@ from salina.logger import TFLogger
 
 from bagua.torch_api.algorithms import bytegrad
 import bagua.torch_api as bagua
-
+from bagua.torch_api.algorithms import gradient_allreduce
 
 def _index(tensor_3d, tensor_2d):
     """This function is used to index a 3d tensors using a 2d tensor"""
@@ -114,7 +114,8 @@ def run_a2c(cfg):
         a2c_agent.parameters(), lr=optimizer_args['lr'] * bagua.get_world_size()
     )
 
-    a2c_agent = a2c_agent.with_bagua([optimizer], bytegrad.ByteGradAlgorithm())
+    a2c_agent.model = a2c_agent.model.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
+    a2c_agent.critic_model = a2c_agent.critic_model.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
 
     # 8) Training loop
     epoch = 0
@@ -165,7 +166,6 @@ def run_a2c(cfg):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
         # Compute the cumulated reward on final_state
         creward = workspace["env/cumulated_reward"]
         creward = creward[done]

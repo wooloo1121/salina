@@ -111,7 +111,7 @@ def run_a2c(cfg):
     # 7) Confgure the optimizer over the a2c agent
     optimizer_args = get_arguments(cfg.algorithm.optimizer)
     optimizer = get_class(cfg.algorithm.optimizer)(
-        a2c_agent.parameters(), **optimizer_args * bagua.get_world_size()
+        a2c_agent.parameters(), lr=optimizer_args['lr'] * bagua.get_world_size()
     )
 
     a2c_agent = a2c_agent.with_bagua([optimizer], bytegrad.ByteGradAlgorithm())

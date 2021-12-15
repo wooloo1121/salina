@@ -71,6 +71,9 @@ def make_cartpole(max_episode_steps):
 
 
 def run_a2c(cfg):
+    torch.cuda.set_device(bagua.get_local_rank())
+    bagua.init_process_group()
+
     # 1)  Build the  logger
     logger = instantiate_class(cfg.logger)
 
@@ -81,6 +84,8 @@ def run_a2c(cfg):
         get_arguments(cfg.algorithm.env),
         n_envs=cfg.algorithm.n_envs,
     )
+
+    env_agent.cuda()
 
     # 3) Create the A2C Agent
     env = instantiate_class(cfg.algorithm.env)

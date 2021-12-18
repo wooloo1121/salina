@@ -66,8 +66,8 @@ class A2CAgent(TAgent):
         self.set(("critic", t), critic)
 
 
-def make_cartpole(max_episode_steps):
-    return TimeLimit(gym.make("CartPole-v0"), max_episode_steps=max_episode_steps)
+def make_gym_env(max_episode_steps):
+    return TimeLimit(gym.make(cfg.env_name), max_episode_steps=max_episode_steps)
 
 
 def run_a2c(cfg):
@@ -85,8 +85,6 @@ def run_a2c(cfg):
         n_envs=cfg.algorithm.n_envs,
     )
 
-    env_agent.cuda()
-
     # 3) Create the A2C Agent
     env = instantiate_class(cfg.algorithm.env)
     observation_size = env.observation_space.shape[0]
@@ -96,17 +94,17 @@ def run_a2c(cfg):
         observation_size, cfg.algorithm.architecture.hidden_size, n_actions
     )
 
-    a2c_agent.cuda()
-
     # 4) Combine env and a2c agents
     agent = Agents(env_agent, a2c_agent)
 
     # 5) Get an agent that is executed on a complete workspace
     agent = TemporalAgent(agent)
+    agent = agent.to(device=cfg.algorithm.device)
     agent.seed(cfg.algorithm.env_seed)
 
     # 6) Configure the workspace to the right dimension
     workspace = salina.Workspace()
+    workspace = workspace.to(device=cfg.algorithm.device)
 
     # 7) Confgure the optimizer over the a2c agent
     optimizer_args = get_arguments(cfg.algorithm.optimizer)

@@ -143,6 +143,7 @@ def run_a2c(cfg):
 
     a2c_agent.model = a2c_agent.model.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
     a2c_agent.critic_model = a2c_agent.critic_model.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
+    a2c_agent.features = a2c_agent.features.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
 
     # 8) Training loop
     epoch = 0

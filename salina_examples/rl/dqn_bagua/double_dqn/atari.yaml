@@ -10,15 +10,15 @@ n_processes: 1
 env_name: PongNoFrameskip-v4
 
 q_agent:
-  classname: salina_examples.rl.dqn.agents.DQNAtariAgent
+  classname: salina_examples.rl.dqn_bagua.agents.DQNAtariAgent
   env:
-    classname: salina_examples.rl.dqn.agents.make_atari_env
+    classname: salina_examples.rl.dqn_bagua.agents.make_atari_env
     env_name: ${env_name}
     max_episode_steps: 100000
 
 algorithm:
   env:
-    classname: salina_examples.rl.dqn.agents.make_atari_env
+    classname: salina_examples.rl.dqn_bagua.agents.make_atari_env
     env_name: ${env_name}
     max_episode_steps: 100000
 
@@ -40,7 +40,7 @@ algorithm:
   hard_target_update: True
   update_target_epochs: 1000
   update_target_tau: 0.005
-  loss_device: cpu
+  loss_device: gpu
   n_envs: ${n_envs}
   n_processes: ${n_processes}
   n_timesteps: 2

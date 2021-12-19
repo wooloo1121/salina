@@ -47,6 +47,7 @@ class A2CAgent(TAgent):
         #    nn.ReLU(),
         #    nn.Linear(hidden_size, n_actions),
         #)
+        self.input_shape = observation_size
         self.features = nn.Sequential(
             nn.Conv2d(observation_size[1], 32, kernel_size=8, stride=4),
             nn.ReLU(),

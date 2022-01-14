@@ -67,7 +67,7 @@ class A2CAgent(TAgent):
 
 
 def make_gym_env(max_episode_steps):
-    return TimeLimit(gym.make(cfg.env_name), max_episode_steps=max_episode_steps)
+    return TimeLimit(gym.make("CartPole-v0"), max_episode_steps=max_episode_steps)
 
 
 def run_a2c(cfg):

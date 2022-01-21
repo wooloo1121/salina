@@ -173,7 +173,7 @@ def run_dqn(q_agent, logger, cfg):
             soft_update_params(q_agent, q_target_agent, tau)
 
 
-@hydra.main(config_path=".", config_name="gym.yaml")
+@hydra.main(config_path=".", config_name="atari.yaml")
 def main(cfg):
     import torch.multiprocessing as mp
 

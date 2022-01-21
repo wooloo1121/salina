@@ -24,7 +24,7 @@ algorithm:
 
   env_seed: 432
   batch_size: 64
-  max_epoch: 100000
+  max_epoch: 1000000
 
   optimizer:
     classname: torch.optim.Adam

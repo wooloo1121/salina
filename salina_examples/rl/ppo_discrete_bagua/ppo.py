@@ -23,6 +23,9 @@ from salina.agents import Agents, NRemoteAgent, TemporalAgent
 from salina.agents.gyma import AutoResetGymAgent, GymAgent
 from salina.logger import TFLogger
 
+from bagua.torch_api.algorithms import bytegrad
+import bagua.torch_api as bagua
+from bagua.torch_api.algorithms import gradient_allreduce
 
 def _index(tensor_3d, tensor_2d):
     """This function is used to index a 3d tensors using a 2d tensor"""
@@ -75,12 +78,12 @@ def run_ppo(ppo_action_agent, ppo_critic_agent, logger, cfg):
     parameters = ppo_critic_agent.parameters()
     optimizer_critic = get_class(cfg.algorithm.optimizer)(parameters, lr=optimizer_args['lr'] * bagua.get_world_size())
 
-    ppo_action_agent_args = get_arguments(cfg.action_agent)
-    ppo_action_agent.model = ppo_action_agent.model.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
-    ppo_critic_agent.model_critic = ppo_critic_agent.model_critic.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
-    if ppo_action_agent_args['classname'] == 'salina_examples.rl.ppo_discrete_bagua.agents.PPOAtariActionAgent':
-        ppo_action_agent.features = ppo_action_agent.features.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
-        ppo_critic_agent.features = ppo_critic_agent.features.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
+    ppo_action_agent_args = get_arguments(cfg.env)
+    ppo_action_agent.model = ppo_action_agent.model.with_bagua([optimizer_action], gradient_allreduce.GradientAllReduceAlgorithm())
+    ppo_critic_agent.critic_model = ppo_critic_agent.critic_model.with_bagua([optimizer_critic], gradient_allreduce.GradientAllReduceAlgorithm())
+    if ppo_action_agent_args['type'] == 1:
+        ppo_action_agent.features = ppo_action_agent.features.with_bagua([optimizer_action], gradient_allreduce.GradientAllReduceAlgorithm())
+        ppo_critic_agent.features = ppo_critic_agent.features.with_bagua([optimizer_critic], gradient_allreduce.GradientAllReduceAlgorithm())
 
     epoch = 0
     iteration = 0

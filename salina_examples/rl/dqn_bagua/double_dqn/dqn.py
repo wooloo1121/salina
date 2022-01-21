@@ -92,8 +92,8 @@ def run_dqn(q_agent, logger, cfg):
         q_agent.parameters(), lr=optimizer_args['lr'] * bagua.get_world_size()
     )
 
-    q_agent_args = get_arguments(cfg.q_agent)
-    if q_agent_args['classname'] == 'salina_examples.rl.dqn_bagua.agents.DQNMLPAgent':
+    q_agent_args = get_arguments(cfg.env)
+    if q_agent_args['type'] == 0:
         q_agent.model.model = q_agent.model.model.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
     else:
         q_agent.cnn.features = q_agent.cnn.features.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
@@ -188,7 +188,7 @@ def run_dqn(q_agent, logger, cfg):
             soft_update_params(q_agent, q_target_agent, tau)
 
 
-@hydra.main(config_path=".", config_name="gym.yaml")
+@hydra.main(config_path=".", config_name="atari.yaml")
 def main(cfg):
     import torch.multiprocessing as mp
 

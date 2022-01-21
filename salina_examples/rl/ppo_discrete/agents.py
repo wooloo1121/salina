@@ -70,3 +70,80 @@ class PPOMLPCriticAgent(TAgent):
 
         critic = self.model_critic(input).squeeze(-1)
         self.set(("critic", t), critic)
+
+
+class PPOAtariActionAgent(TAgent):
+    def __init__(self, **kwargs):
+        super().__init__()
+        env = instantiate_class(kwargs["env"])
+        input_size = (1,) + env.observation_space.shape
+        num_outputs = env.action_space.n
+        self.input_shape = input_size
+        #hs = kwargs["hidden_size"]
+        #self.model = nn.Sequential(
+        #    nn.Linear(input_size, hs), nn.ReLU(), nn.Linear(hs, num_outputs)
+        #)
+        self.features = nn.Sequential(
+            nn.Conv2d(input_size[1], 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
+        )
+        self.model = nn.Sequential(
+            nn.Linear(self.feature_size(), 512), nn.ReLU(), nn.Linear(512, num_outputs)
+        )
+
+    def forward(self, t, replay, stochastic, **kwargs):
+        input = self.get(("env/env_obs", t)).float()
+        x = self.features(input)
+        x = x.view(x.size(0), -1)
+        scores = self.model(x)
+        probs = torch.softmax(scores, dim=-1)
+        self.set(("action_probs", t), probs)
+
+        if not replay:
+            if stochastic:
+                action = torch.distributions.Categorical(probs).sample()
+            else:
+                action = probs.argmax(1)
+            self.set(("action", t), action)
+
+    def feature_size(self):
+        return self.features(torch.zeros(1, *self.input_shape[1:])).view(1, -1).size(1)
+
+
+class PPOAtariCriticAgent(TAgent):
+    def __init__(self, **kwargs):
+        super().__init__()
+        env = instantiate_class(kwargs["env"])
+        input_size = (1,) + env.observation_space.shape
+        num_outputs = env.action_space.n
+        self.input_shape = input_size
+        #hs = kwargs["hidden_size"]
+        #self.model_critic = nn.Sequential(
+        #    nn.Linear(input_size, hs), nn.ReLU(), nn.Linear(hs, 1)
+        #)
+        self.features = nn.Sequential(
+            nn.Conv2d(input_size[1], 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
+        )
+        self.critic_model = nn.Sequential(
+            nn.Linear(self.feature_size(), 512), nn.ReLU(), nn.Linear(512, 1)
+        )
+
+    def forward(self, t, **kwargs):
+        input = self.get(("env/env_obs", t)).float()
+        x = self.features(input)
+        x = x.view(x.size(0), -1)
+
+        critic = self.model_critic(x).squeeze(-1)
+        self.set(("critic", t), critic)
+
+    def feature_size(self):
+        return self.features(torch.zeros(1, *self.input_shape[1:])).view(1, -1).size(1)

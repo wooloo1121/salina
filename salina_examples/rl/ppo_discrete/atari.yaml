@@ -9,18 +9,18 @@ env:
   type: 1
 
 action_agent:
-  classname: salina_examples.rl.ppo_discrete_bagua.agents.PPOAtariActionAgent
+  classname: salina_examples.rl.ppo_discrete.agents.PPOAtariActionAgent
   hidden_size: 32
   env:
-    classname: salina_examples.rl.ppo_discrete_bagua.agents.make_atari_env
+    classname: salina_examples.rl.ppo_discrete.agents.make_atari_env
     env_name: PongNoFrameskip-v4
     max_episode_steps: 100
 
 critic_agent:
-  classname: salina_examples.rl.ppo_discrete_bagua.agents.PPOAtariCriticAgent
+  classname: salina_examples.rl.ppo_discrete.agents.PPOAtariCriticAgent
   hidden_size: 32
   env:
-    classname: salina_examples.rl.ppo_discrete_bagua.agents.make_atari_env
+    classname: salina_examples.rl.ppo_discrete.agents.make_atari_env
     env_name: PongNoFrameskip-v4
     max_episode_steps: 100
 
@@ -39,10 +39,10 @@ algorithm:
   v_epochs: 1
   gae: 0.7
 
-  device: cuda
+  device: cpu
 
   env:
-    classname: salina_examples.rl.ppo_discrete_bagua.agents.make_atari_env
+    classname: salina_examples.rl.ppo_discrete.agents.make_atari_env
     env_name: PongNoFrameskip-v4
     max_episode_steps: 100
 

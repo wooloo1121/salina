@@ -23,9 +23,6 @@ from salina.agents import Agents, RemoteAgent, TemporalAgent
 from salina.agents.gyma import AutoResetGymAgent, GymAgent
 from salina.logger import TFLogger
 
-from bagua.torch_api.algorithms import bytegrad
-import bagua.torch_api as bagua
-from bagua.torch_api.algorithms import gradient_allreduce
 
 from salina_examples.rl.atari_wrappers import make_atari, wrap_deepmind, wrap_pytorch
 
@@ -100,9 +97,6 @@ def make_atari_env(max_episode_steps):
     return e
 
 def run_a2c(cfg):
-    torch.cuda.set_device(bagua.get_local_rank())
-    bagua.init_process_group()
-
     # 1)  Build the  logger
     logger = instantiate_class(cfg.logger)
 
@@ -134,17 +128,12 @@ def run_a2c(cfg):
 
     # 6) Configure the workspace to the right dimension
     workspace = salina.Workspace()
-    workspace = workspace.to(device=cfg.algorithm.device)
 
     # 7) Confgure the optimizer over the a2c agent
     optimizer_args = get_arguments(cfg.algorithm.optimizer)
     optimizer = get_class(cfg.algorithm.optimizer)(
-        a2c_agent.parameters(), lr=optimizer_args['lr'] * bagua.get_world_size()
+        a2c_agent.parameters(), **optimizer_args
     )
-
-    a2c_agent.model = a2c_agent.model.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
-    a2c_agent.critic_model = a2c_agent.critic_model.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
-    a2c_agent.features = a2c_agent.features.with_bagua([optimizer], gradient_allreduce.GradientAllReduceAlgorithm())
 
     # 8) Training loop
     epoch = 0

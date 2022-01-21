@@ -5,6 +5,9 @@ logger:
   modulo: 10
   verbose: True
 
+env:
+  type: 0
+
 action_agent:
   classname: salina_examples.rl.ppo_discrete_bagua.agents.PPOMLPActionAgent
   hidden_size: 32
@@ -36,7 +39,7 @@ algorithm:
   v_epochs: 1
   gae: 0.7
 
-  device: gpu
+  device: cuda
 
   env:
     classname: salina_examples.rl.ppo_discrete_bagua.agents.make_gym_env

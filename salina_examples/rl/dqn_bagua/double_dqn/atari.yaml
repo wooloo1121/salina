@@ -9,6 +9,9 @@ n_envs: 1
 n_processes: 1
 env_name: PongNoFrameskip-v4
 
+env:
+  type: 1
+
 q_agent:
   classname: salina_examples.rl.dqn_bagua.agents.DQNAtariAgent
   env:
@@ -40,7 +43,7 @@ algorithm:
   hard_target_update: True
   update_target_epochs: 1000
   update_target_tau: 0.005
-  loss_device: gpu
+  loss_device: cuda
   n_envs: ${n_envs}
   n_processes: ${n_processes}
   n_timesteps: 2

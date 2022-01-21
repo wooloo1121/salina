@@ -8,6 +8,7 @@
 import copy
 import time
 
+import gym_algorithmic
 import gym
 import hydra
 import torch
@@ -64,7 +65,7 @@ class A2CAgent(TAgent):
 
 
 def make_cartpole(max_episode_steps):
-    return TimeLimit(gym.make("CartPole-v0"), max_episode_steps=max_episode_steps)
+    return TimeLimit(gym.make("MemorizeDigits-v0"), max_episode_steps=max_episode_steps)
 
 
 def run_a2c(cfg):

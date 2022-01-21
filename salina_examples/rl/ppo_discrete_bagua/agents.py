@@ -61,14 +61,14 @@ class PPOMLPCriticAgent(TAgent):
         input_size = env.observation_space.shape[0]
         num_outputs = env.action_space.n
         hs = kwargs["hidden_size"]
-        self.model_critic = nn.Sequential(
+        self.critic_model = nn.Sequential(
             nn.Linear(input_size, hs), nn.ReLU(), nn.Linear(hs, 1)
         )
 
     def forward(self, t, **kwargs):
         input = self.get(("env/env_obs", t))
 
-        critic = self.model_critic(input).squeeze(-1)
+        critic = self.critic_model(input).squeeze(-1)
         self.set(("critic", t), critic)
 
 
@@ -88,11 +88,15 @@ class PPOAtariActionAgent(TAgent):
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Conv2d(256, 512, kernel_size=3, stride=1),
             nn.ReLU(),
         )
         self.model = nn.Sequential(
-            nn.Linear(self.feature_size(), 512), nn.ReLU(), nn.Linear(512, num_outputs)
+            nn.Linear(self.feature_size(), 1028), nn.ReLU(), nn.Linear(1028, num_outputs)
         )
 
     def forward(self, t, replay, stochastic, **kwargs):
@@ -110,7 +114,7 @@ class PPOAtariActionAgent(TAgent):
                 action = probs.argmax(1)
             self.set(("action", t), action)
 
-     def feature_size(self):
+    def feature_size(self):
         return self.features(torch.zeros(1, *self.input_shape[1:])).view(1, -1).size(1)
 
 
@@ -130,11 +134,14 @@ class PPOAtariCriticAgent(TAgent):
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1),
             nn.ReLU(),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1),
+            nn.Conv2d(256, 512, kernel_size=3, stride=1),
+            nn.Conv2d(512, 1024, kernel_size=3, stride=1),
         )
-         self.critic_model = nn.Sequential(
-            nn.Linear(self.feature_size(), 512), nn.ReLU(), nn.Linear(512, 1)
+        self.critic_model = nn.Sequential(
+            nn.Linear(self.feature_size(), 2048), nn.ReLU(), nn.Linear(2048, 1)
         )
 
     def forward(self, t, **kwargs):
@@ -142,7 +149,7 @@ class PPOAtariCriticAgent(TAgent):
         x = self.features(input)
         x = x.view(x.size(0), -1)
 
-        critic = self.model_critic(x).squeeze(-1)
+        critic = self.critic_model(x).squeeze(-1)
         self.set(("critic", t), critic)
 
     def feature_size(self):

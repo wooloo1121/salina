@@ -38,7 +38,6 @@ def _torch_cat_dict(d):
         r[k] = torch.cat([dd[k] for dd in d], dim=0)
     return r
 
-
 class BraxAgent(TAgent):
     """An agent based on a brax environment, with autoreset
 
@@ -86,7 +85,7 @@ class BraxAgent(TAgent):
             o = self.gym_env.reset()
             if self.brax_device is None:
                 self.brax_device = o.device
-                print(" -- BRAX Device is ", self.brax_device)
+                #print(" -- BRAX Device is ", self.brax_device)
                 self.to(self.brax_device)
 
             my_device = self.ghost_params.device
@@ -124,8 +123,11 @@ class BraxAgent(TAgent):
                 ),
                 "reward": rewards.float(),
                 "timestep": self.timestep,
+
                 "cumulated_reward": self.cumulated_reward,
             }
+            if done.any():
+                assert done.all()
             # Mettre des To(my_device) partout
             self.timestep += 1
             self.timestep = ((1.0 - done.float()) * self.timestep).long()

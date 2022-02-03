@@ -8,7 +8,6 @@
 import copy
 import time
 
-#import gym_algorithmic
 import gym
 import hydra
 import torch
@@ -25,6 +24,8 @@ from salina.agents.gyma import AutoResetGymAgent, GymAgent
 from salina.logger import TFLogger
 
 
+from salina_examples.rl.atari_wrappers import make_atari, wrap_deepmind, wrap_pytorch
+
 def _index(tensor_3d, tensor_2d):
     """This function is used to index a 3d tensors using a 2d tensor"""
     x, y, z = tensor_3d.size()
@@ -36,24 +37,41 @@ def _index(tensor_3d, tensor_2d):
 
 
 class A2CAgent(TAgent):
-    def __init__(self, observation_size, hidden_size, n_actions):
+    def __init__(self, observation_size, n_actions):
         super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(observation_size, hidden_size),
+        #self.model = nn.Sequential(
+        #    nn.Linear(observation_size, hidden_size),
+        #    nn.ReLU(),
+        #    nn.Linear(hidden_size, n_actions),
+        #)
+        self.input_shape = observation_size
+        self.features = nn.Sequential(
+            nn.Conv2d(observation_size[1], 32, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.Linear(hidden_size, n_actions),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
         )
+        self.model = nn.Sequential(
+            nn.Linear(self.feature_size(), 512), nn.ReLU(), nn.Linear(512, n_actions)
+        )
+        #self.critic_model = nn.Sequential(
+        #    nn.Linear(observation_size, hidden_size),
+        #    nn.ReLU(),
+        #    nn.Linear(hidden_size, 1),
+        #)
         self.critic_model = nn.Sequential(
-            nn.Linear(observation_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, 1),
+            nn.Linear(self.feature_size(), 512), nn.ReLU(), nn.Linear(512, 1)
         )
 
     def forward(self, t, stochastic, **kwargs):
-        observation = self.get(("env/env_obs", t))
-        scores = self.model(observation)
+        observation = self.get(("env/env_obs", t)).float()
+        x = self.features(observation)
+        x = x.view(x.size(0), -1)
+        scores = self.model(x)
         probs = torch.softmax(scores, dim=-1)
-        critic = self.critic_model(observation).squeeze(-1)
+        critic = self.critic_model(x).squeeze(-1)
         if stochastic:
             action = torch.distributions.Categorical(probs).sample()
         else:
@@ -63,10 +81,20 @@ class A2CAgent(TAgent):
         self.set(("action_probs", t), probs)
         self.set(("critic", t), critic)
 
+    def feature_size(self):
+        return self.features(torch.zeros(1, *self.input_shape[1:])).view(1, -1).size(1)
+
 
 def make_cartpole(max_episode_steps):
-    return TimeLimit(gym.make("MemorizeDigits-v0"), max_episode_steps=max_episode_steps)
+    return TimeLimit(gym.make("CartPole-v0"), max_episode_steps=max_episode_steps)
 
+
+def make_atari_env(max_episode_steps):
+    e = make_atari("PongNoFrameskip-v4")
+    e = wrap_deepmind(e)
+    e = wrap_pytorch(e)
+    e = TimeLimit(e, max_episode_steps=max_episode_steps)
+    return e
 
 def run_a2c(cfg):
     # 1)  Build the  logger
@@ -82,11 +110,12 @@ def run_a2c(cfg):
 
     # 3) Create the A2C Agent
     env = instantiate_class(cfg.algorithm.env)
-    observation_size = env.observation_space.shape[0]
+    #observation_size = env.observation_space.shape[0]
+    observation_size = (1,) + env.observation_space.shape
     n_actions = env.action_space.n
     del env
     a2c_agent = A2CAgent(
-        observation_size, cfg.algorithm.architecture.hidden_size, n_actions
+        observation_size, n_actions
     )
 
     # 4) Combine env and a2c agents
@@ -94,6 +123,7 @@ def run_a2c(cfg):
 
     # 5) Get an agent that is executed on a complete workspace
     agent = TemporalAgent(agent)
+    agent = agent.to(device=cfg.algorithm.device)
     agent.seed(cfg.algorithm.env_seed)
 
     # 6) Configure the workspace to the right dimension
@@ -154,7 +184,6 @@ def run_a2c(cfg):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
         # Compute the cumulated reward on final_state
         creward = workspace["env/cumulated_reward"]
         creward = creward[done]

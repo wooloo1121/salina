@@ -9,7 +9,7 @@ algorithm:
   env_seed: 432
   n_envs: 8
   n_timesteps: 16
-  max_epochs: 50000
+  max_epochs: 10000
   discount_factor: 0.95
   entropy_coef: 0.001
   critic_coef: 1.0
@@ -19,7 +19,7 @@ algorithm:
     hidden_size: 32
 
   env:
-    classname: salina_examples.rl.a2c.mono_cpu.main.make_cartpole
+    classname: salina_examples.rl.a2c.mono_cpu_2.main.make_cartpole
     max_episode_steps: 100
 
   optimizer:

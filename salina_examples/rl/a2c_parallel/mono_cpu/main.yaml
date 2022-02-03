@@ -19,7 +19,7 @@ algorithm:
     hidden_size: 32
 
   env:
-    classname: salina_examples.rl.a2c.mono_cpu.main.make_cartpole
+    classname: salina_examples.rl.a2c_parallel.mono_cpu.main.make_cartpole
     max_episode_steps: 100
 
   optimizer:

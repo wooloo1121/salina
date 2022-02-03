@@ -8,7 +8,6 @@
 import copy
 import time
 
-#import gym_algorithmic
 import gym
 import hydra
 import torch
@@ -35,7 +34,7 @@ def _index(tensor_3d, tensor_2d):
     return v
 
 
-class A2CAgent(TAgent):
+class ProbAgent(TAgent):
     def __init__(self, observation_size, hidden_size, n_actions):
         super().__init__()
         self.model = nn.Sequential(
@@ -43,29 +42,45 @@ class A2CAgent(TAgent):
             nn.ReLU(),
             nn.Linear(hidden_size, n_actions),
         )
-        self.critic_model = nn.Sequential(
-            nn.Linear(observation_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, 1),
-        )
 
-    def forward(self, t, stochastic, **kwargs):
+    def forward(self, t, **kwargs):
         observation = self.get(("env/env_obs", t))
         scores = self.model(observation)
         probs = torch.softmax(scores, dim=-1)
-        critic = self.critic_model(observation).squeeze(-1)
+        self.set(("action_probs", t), probs)
+
+
+class ActionAgent(TAgent):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, t, stochastic, **kwargs):
+        probs = self.get(("action_probs", t))
         if stochastic:
             action = torch.distributions.Categorical(probs).sample()
         else:
             action = probs.argmax(1)
 
         self.set(("action", t), action)
-        self.set(("action_probs", t), probs)
+
+
+class CriticAgent(TAgent):
+    def __init__(self, observation_size, hidden_size, n_actions):
+        super().__init__()
+        self.critic_model = nn.Sequential(
+            nn.Linear(observation_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, 1),
+        )
+
+    def forward(self, t, **kwargs):
+        observation = self.get(("env/env_obs", t))
+        critic = self.critic_model(observation).squeeze(-1)
         self.set(("critic", t), critic)
 
 
 def make_cartpole(max_episode_steps):
-    return TimeLimit(gym.make("MemorizeDigits-v0"), max_episode_steps=max_episode_steps)
+    return TimeLimit(gym.make("CartPole-v0"), max_episode_steps=max_episode_steps)
 
 
 def run_a2c(cfg):
@@ -85,25 +100,31 @@ def run_a2c(cfg):
     observation_size = env.observation_space.shape[0]
     n_actions = env.action_space.n
     del env
-    a2c_agent = A2CAgent(
+    prob_agent = ProbAgent(
+        observation_size, cfg.algorithm.architecture.hidden_size, n_actions
+    )
+    action_agent = ActionAgent()
+    critic_agent = CriticAgent(
         observation_size, cfg.algorithm.architecture.hidden_size, n_actions
     )
 
-    # 4) Combine env and a2c agents
-    agent = Agents(env_agent, a2c_agent)
+    # 4) Combine env and policy agents
+    agent = Agents(env_agent, prob_agent, action_agent)
 
     # 5) Get an agent that is executed on a complete workspace
     agent = TemporalAgent(agent)
     agent.seed(cfg.algorithm.env_seed)
+
+    # 5 bis) Create the temporal critic agent to compute critic values over the workspace
+    tcritic_agent = TemporalAgent(critic_agent)
 
     # 6) Configure the workspace to the right dimension
     workspace = salina.Workspace()
 
     # 7) Confgure the optimizer over the a2c agent
     optimizer_args = get_arguments(cfg.algorithm.optimizer)
-    optimizer = get_class(cfg.algorithm.optimizer)(
-        a2c_agent.parameters(), **optimizer_args
-    )
+    parameters = nn.Sequential(prob_agent, critic_agent).parameters()
+    optimizer = get_class(cfg.algorithm.optimizer)(parameters, **optimizer_args)
 
     # 8) Training loop
     epoch = 0
@@ -117,6 +138,9 @@ def run_a2c(cfg):
             )
         else:
             agent(workspace, t=0, n_steps=cfg.algorithm.n_timesteps, stochastic=True)
+
+        # Compute the critic value over the whole workspace
+        tcritic_agent(workspace, n_steps=cfg.algorithm.n_timesteps)
 
         # Get relevant tensors (size are timestep x n_envs x ....)
         critic, done, action_probs, reward, action = workspace[

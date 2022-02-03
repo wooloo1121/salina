@@ -5,21 +5,24 @@ logger:
   modulo: 1
   verbose: True
 
+env_name: PongNoFrameskip-v4
+
 algorithm:
   env_seed: 432
   n_envs: 8
   n_timesteps: 16
-  max_epochs: 50000
+  max_epochs: 100000
   discount_factor: 0.95
   entropy_coef: 0.001
   critic_coef: 1.0
   a2c_coef: 0.1
+  device: cpu
 
   architecture:
     hidden_size: 32
 
   env:
-    classname: salina_examples.rl.a2c.mono_cpu.main.make_cartpole
+    classname: salina_examples.rl.a2c.mono_cpu_atari.main.make_atari_env
     max_episode_steps: 100
 
   optimizer:

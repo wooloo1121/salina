@@ -8,7 +8,6 @@
 import copy
 import time
 
-#import gym_algorithmic
 import gym
 import hydra
 import torch
@@ -65,10 +64,10 @@ class A2CAgent(TAgent):
 
 
 def make_cartpole(max_episode_steps):
-    return TimeLimit(gym.make("MemorizeDigits-v0"), max_episode_steps=max_episode_steps)
+    return TimeLimit(gym.make("CartPole-v0"), max_episode_steps=max_episode_steps)
 
 
-def run_a2c(cfg):
+def run_a2c(cfg,q,n,num_agents):
     # 1)  Build the  logger
     logger = instantiate_class(cfg.logger)
 
@@ -105,6 +104,8 @@ def run_a2c(cfg):
         a2c_agent.parameters(), **optimizer_args
     )
 
+    num_gradient = 30000 * num_agents
+    count = 0
     # 8) Training loop
     epoch = 0
     for epoch in range(cfg.algorithm.max_epochs):
@@ -153,13 +154,71 @@ def run_a2c(cfg):
         )
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
+
+        if epoch < 20000:
+            optimizer.step()
+        else:
+            gradient = []
+            for p in a2c_agent.parameters():
+                gradient.append(p.grad)
+
+            for i in range(num_agents):
+            	q[i].put(gradient)
+            if epoch % 100 == 99:
+                optimizer.zero_grad()
+                c = 0.0
+                while not q[n].empty() and c < 100:
+                    g = q[n].get()
+                    c += 1
+                    count += 1
+                    print("Get!")
+                    i = 0
+                    for p in a2c_agent.parameters():
+                        p.grad += g[i]
+                        i += 1
+                for p in a2c_agent.parameters():
+                    p.grad = p.grad / c
+                optimizer.step()
 
         # Compute the cumulated reward on final_state
         creward = workspace["env/cumulated_reward"]
         creward = creward[done]
         if creward.size()[0] > 0:
             logger.add_scalar("reward", creward.mean().item(), epoch)
+            print("epoch end")
+
+#    count_start = count
+#    optimizer.zero_grad()
+    while count < num_gradient:
+        g = q[n].get()
+        count += 1
+        print(count)
+#        i = 0
+#        for p in a2c_agent.parameters():
+#            p.grad += g[i]
+#            i += 1
+#        if (count - count_start)%100 == 0 or count == num_gradient:
+#            epoch += 1
+#            if (count - count_start)%100 == 0:
+#                for p in a2c_agent.parameters():
+#                    p.grad = p.grad / 100.0
+#            else:
+#                c = (count - count_start)%100
+#                for p in a2c_agent.parameters():
+#                    p.grad = p.grad / float(c)
+#            optimizer.step()
+#            optimizer.zero_grad()
+#            workspace.zero_grad()
+#            # Execute the agent on the workspace
+#            workspace.copy_n_last_steps(1)
+#            agent(
+#                  workspace, t=1, n_steps=cfg.algorithm.n_timesteps - 1, stochastic=True
+#            )
+#            creward = workspace["env/cumulated_reward"]
+#            creward = creward[done]
+#            if creward.size()[0] > 0:
+#                logger.add_scalar("reward", creward.mean().item(), epoch) 
+
 
 
 @hydra.main(config_path=".", config_name="main.yaml")
@@ -167,7 +226,21 @@ def main(cfg):
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn")
-    run_a2c(cfg)
+    num_agents = 1
+
+    q = []
+    p = []
+    for i in range(num_agents):
+        q.append(mp.Queue())
+    for i in range(num_agents):
+        p.append(mp.Process(target=run_a2c, args=(cfg,q,i,num_agents,)))
+        p[i].start()
+    print("start to join")
+    for i in range(num_agents):
+        p[i].join()
+        print("joined!")
+
+    #run_a2c(cfg)
 
 
 if __name__ == "__main__":

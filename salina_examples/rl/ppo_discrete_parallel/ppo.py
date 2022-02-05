@@ -41,7 +41,11 @@ def _state_dict(agent, device):
     return sd
 
 
-def run_ppo(ppo_action_agent, ppo_critic_agent, logger, cfg):
+def run_ppo(cfg,q_action,q_critic,n,num_agents):
+    logger = instantiate_class(cfg.logger)
+    logger.save_hps(cfg)
+    ppo_action_agent = instantiate_class(cfg.action_agent)
+    ppo_critic_agent = instantiate_class(cfg.critic_agent)
     ppo_action_agent.set_name("ppo_action")
     env_agent = AutoResetGymAgent(
         get_class(cfg.algorithm.env),
@@ -75,7 +79,8 @@ def run_ppo(ppo_action_agent, ppo_critic_agent, logger, cfg):
     epoch = 0
     iteration = 0
     num_gradient = 30000 * num_agents
-    count = 0
+    count_action = 0
+    count_critic = 0
     for epoch in range(cfg.algorithm.max_epochs):
         for a in acq_remote_agent.get_by_name("ppo_action"):
             a.load_state_dict(_state_dict(ppo_action_agent, "cpu"))
@@ -162,14 +167,14 @@ def run_ppo(ppo_action_agent, ppo_critic_agent, logger, cfg):
                     gradient.append(p.grad)
 
                 for i in range(num_agents):
-                    q[i].put(gradient)
-                if epoch % 100 == 99:
+                    q_action[i].put(gradient)
+                if epoch % 50 == 49:
                     optimizer_action.zero_grad()
                     c = 0.0
-                    while not q[n].empty() and c < 100:
-                        g = q[n].get()
+                    while not q_action[n].empty() and c < 60:
+                        g = q_action[n].get()
                         c += 1
-                        count += 1
+                        count_action += 1
                         print("Get!")
                         i = 0
                         for p in ppo_action_agent.parameters():
@@ -210,14 +215,14 @@ def run_ppo(ppo_action_agent, ppo_critic_agent, logger, cfg):
                     gradient.append(p.grad)
 
                 for i in range(num_agents):
-                    q[i].put(gradient)
-                if epoch % 100 == 99:
+                    q_critic[i].put(gradient)
+                if epoch % 50 == 49:
                     optimizer_critic.zero_grad()
                     c = 0.0
-                    while not q[n].empty() and c < 100:
-                        g = q[n].get()
+                    while not q_critic[n].empty() and c < 60:
+                        g = q_critic[n].get()
                         c += 1
-                        count += 1
+                        count_critic += 1
                         print("Get!")
                         i = 0
                         for p in ppo_critic_agent.parameters():
@@ -230,10 +235,14 @@ def run_ppo(ppo_action_agent, ppo_critic_agent, logger, cfg):
             #optimizer_critic.step()
             iteration += 1
 
-    while count < num_gradient:
-        g = q[n].get()
-        count += 1
-        print(count)
+    while count_action < num_gradient:
+        g = q_action[n].get()
+        count_action += 1
+        print(count_action)
+    while count_critic < num_gradient:
+        g = q_critic[n].get()
+        count_critic += 1
+        print(count_critic)
 
 @hydra.main(config_path=".", config_name="main.yaml")
 def main(cfg):
@@ -247,12 +256,14 @@ def main(cfg):
 
     num_agents = 2
 
-    q = []
+    q_action = []
+    q_critic = []
     p = []
     for i in range(num_agents):
-        q.append(mp.Queue())
+        q_action.append(mp.Queue())
+        q_critic.append(mp.Queue())
     for i in range(num_agents):
-        p.append(mp.Process(target=run_ppo, args=(action_agent, critic_agent, logger, cfg,q,i,num_agents,)))
+        p.append(mp.Process(target=run_ppo, args=(cfg,q_action,q_critic,i,num_agents,)))
         p[i].start()
     print("start to join")
     for i in range(num_agents):

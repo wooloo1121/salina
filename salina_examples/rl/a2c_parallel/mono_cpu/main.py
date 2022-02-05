@@ -226,7 +226,7 @@ def main(cfg):
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn")
-    num_agents = 1
+    num_agents = 4
 
     q = []
     p = []

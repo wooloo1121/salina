@@ -36,7 +36,10 @@ def _state_dict(agent, device):
     return sd
 
 
-def run_dqn(q_agent, logger, cfg):
+def run_dqn(cfg,q,n,num_agents):
+    logger = instantiate_class(cfg.logger)
+    logger.save_hps(cfg)
+    q_agent = instantiate_class(cfg.q_agent)
     q_agent.set_name("q_agent")
     env_agent = AutoResetGymAgent(
         get_class(cfg.algorithm.env),
@@ -86,6 +89,8 @@ def run_dqn(q_agent, logger, cfg):
         q_agent.parameters(), **optimizer_args
     )
     iteration = 0
+    num_gradient = 30000 * num_agents
+    count = 0
     for epoch in range(cfg.algorithm.max_epoch):
         epsilon = epsilon_by_epoch(epoch)
         logger.add_scalar("monitor/epsilon", epsilon, iteration)
@@ -160,7 +165,7 @@ def run_dqn(q_agent, logger, cfg):
                 optimizer.step()
             else:
                 gradient = []
-                for p in a2c_agent.parameters():
+                for p in q_agent.parameters():
                     gradient.append(p.grad)
 
                 for i in range(num_agents):
@@ -174,10 +179,10 @@ def run_dqn(q_agent, logger, cfg):
                         count += 1
                         print("Get!")
                         i = 0
-                        for p in a2c_agent.parameters():
+                        for p in q_agent.parameters():
                             p.grad += g[i]
                             i += 1
-                    for p in a2c_agent.parameters():
+                    for p in q_agent.parameters():
                         p.grad = p.grad / c
                     if cfg.algorithm.clip_grad > 0:
                         n = torch.nn.utils.clip_grad_norm_(
@@ -202,23 +207,27 @@ def run_dqn(q_agent, logger, cfg):
             tau = cfg.algorithm.update_target_tau
             soft_update_params(q_agent, q_target_agent, tau)
 
+    while count < num_gradient:
+        g = q[n].get()
+        count += 1
+        print(count)
 
 @hydra.main(config_path=".", config_name="gym.yaml")
 def main(cfg):
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn")
-    logger = instantiate_class(cfg.logger)
-    logger.save_hps(cfg)
+    #logger = instantiate_class(cfg.logger)
+    #logger.save_hps(cfg)
     num_agents = 2
 
-    q_agent = instantiate_class(cfg.q_agent)
+    #q_agent = instantiate_class(cfg.q_agent)
     q = []
     p = []
     for i in range(num_agents):
         q.append(mp.Queue())
     for i in range(num_agents):
-        p.append(mp.Process(target=run_dqn, args=(q_agent, logger, cfg,q,i,num_agents,)))
+        p.append(mp.Process(target=run_dqn, args=(cfg,q,i,num_agents,)))
         p[i].start()
     print("start to join")
     for i in range(num_agents):

@@ -104,7 +104,7 @@ def run_a2c(cfg,q,n,num_agents):
         a2c_agent.parameters(), **optimizer_args
     )
 
-    num_gradient = 30000 * num_agents
+    num_gradient = 5000 * num_agents
     count = 0
     # 8) Training loop
     epoch = 0
@@ -155,7 +155,7 @@ def run_a2c(cfg,q,n,num_agents):
         optimizer.zero_grad()
         loss.backward()
 
-        if epoch < 20000:
+        if epoch < 5000:
             optimizer.step()
         else:
             gradient = []
@@ -179,6 +179,10 @@ def run_a2c(cfg,q,n,num_agents):
                 for p in a2c_agent.parameters():
                     p.grad = p.grad / c
                 optimizer.step()
+#                while not q[n].empty():
+#                    g = q[n].get()
+#                    print("Get!")
+#                    count += 1
 
         # Compute the cumulated reward on final_state
         creward = workspace["env/cumulated_reward"]
@@ -226,7 +230,7 @@ def main(cfg):
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn")
-    num_agents = 4
+    num_agents = 6
 
     q = []
     p = []

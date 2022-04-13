@@ -168,20 +168,24 @@ def run_ppo(cfg,q_action,q_critic,n,num_agents):
 
                 for i in range(num_agents):
                     q_action[i].put(gradient)
-                if epoch % 50 == 49:
+                if epoch % 100 == 99:
                     optimizer_action.zero_grad()
-                    c = 0.0
-                    while not q_action[n].empty() and c < 60:
+                    c = 0
+                    while not q_action[n].empty():
                         g = q_action[n].get()
-                        c += 1
                         count_action += 1
+                        c += 1
                         print("Get!")
                         i = 0
                         for p in ppo_action_agent.parameters():
                             p.grad += g[i]
                             i += 1
+                        if c == 100:
+                            for p in ppo_action_agent.parameters():
+                                p.grad = p.grad / float(c)
+                            c = 1
                     for p in ppo_action_agent.parameters():
-                        p.grad = p.grad / c
+                        p.grad = p.grad / float(c)
                     optimizer_action.step()
 
             #optimizer_action.step()
@@ -216,10 +220,10 @@ def run_ppo(cfg,q_action,q_critic,n,num_agents):
 
                 for i in range(num_agents):
                     q_critic[i].put(gradient)
-                if epoch % 50 == 49:
+                if epoch % 100 == 99:
                     optimizer_critic.zero_grad()
-                    c = 0.0
-                    while not q_critic[n].empty() and c < 60:
+                    c = 0
+                    while not q_critic[n].empty():
                         g = q_critic[n].get()
                         c += 1
                         count_critic += 1
@@ -228,8 +232,12 @@ def run_ppo(cfg,q_action,q_critic,n,num_agents):
                         for p in ppo_critic_agent.parameters():
                             p.grad += g[i]
                             i += 1
+                        if c == 100:
+                            for p in ppo_action_agent.parameters():
+                                p.grad = p.grad / float(c)
+                            c = 1
                     for p in ppo_critic_agent.parameters():
-                        p.grad = p.grad / c
+                        p.grad = p.grad / float(c)
                     optimizer_critic.step()
 
             #optimizer_critic.step()

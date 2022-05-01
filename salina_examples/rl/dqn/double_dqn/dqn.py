@@ -106,6 +106,7 @@ def run_dqn(q_agent, logger, cfg):
         creward = creward[done]
         if creward.size()[0] > 0:
             logger.add_scalar("monitor/reward", creward.mean().item(), epoch)
+            print("reward " + str(creward.mean().item()) + " " + str(epoch))
 
         logger.add_scalar("monitor/replay_buffer_size", replay_buffer.size(), epoch)
 
@@ -173,7 +174,7 @@ def run_dqn(q_agent, logger, cfg):
             soft_update_params(q_agent, q_target_agent, tau)
 
 
-@hydra.main(config_path=".", config_name="atari.yaml")
+@hydra.main(config_path=".", config_name="gym.yaml")
 def main(cfg):
     import torch.multiprocessing as mp
 

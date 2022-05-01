@@ -277,9 +277,11 @@ class A2CAtariAgent(TAgent):
 
     def forward(self, t, stochastic, replay, **kwargs):
         input = self.get(("env/env_obs", t))
+        #print(input.dtype)
+        input = input.type(torch.FloatTensor)
         z = self._forward_nn(input)
         scores = self.linear(z)
-        probs = torch.softmax(scores, dim=-1)
+        probs = torch.softmax(scores/100.0, dim=-1)
         self.set(("action_probs", t), probs)
 
         if not replay:

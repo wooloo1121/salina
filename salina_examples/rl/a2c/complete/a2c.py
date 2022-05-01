@@ -151,9 +151,9 @@ def run_a2c(a2c_agent, logger, cfg):
         creward = creward[done]
         if creward.size()[0] > 0:
             logger.add_scalar("reward", creward.mean().item(), epoch)
+            print("reward " + str(creward.mean().item()) + " " + str(epoch))
 
-
-@hydra.main(config_path=".", config_name="main.yaml")
+@hydra.main(config_path=".", config_name="main_atari.yaml")
 def main(cfg):
     import torch.multiprocessing as mp
 

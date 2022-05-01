@@ -23,7 +23,7 @@ algorithm:
   n_timesteps: 16
   overlapping_timesteps: 1
   burning_timesteps: 0
-  max_epochs: 10000
+  max_epochs: 500000
   discount_factor: 0.99
   entropy_coef: 0.001
   critic_coef: 1.0

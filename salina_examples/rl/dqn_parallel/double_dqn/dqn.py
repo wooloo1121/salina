@@ -36,7 +36,7 @@ def _state_dict(agent, device):
     return sd
 
 
-def run_dqn(cfg,q,n,num_agents):
+def run_dqn(cfg,queue,index,num_agents,seed):
     logger = instantiate_class(cfg.logger)
     logger.save_hps(cfg)
     q_agent = instantiate_class(cfg.q_agent)
@@ -46,6 +46,7 @@ def run_dqn(cfg,q,n,num_agents):
         get_arguments(cfg.algorithm.env),
         n_envs=int(cfg.algorithm.n_envs / cfg.algorithm.n_processes),
     )
+    pnum = len(list(q_agent.parameters()))
 
     q_target_agent = copy.deepcopy(q_agent)
 
@@ -57,7 +58,7 @@ def run_dqn(cfg,q,n,num_agents):
         n_steps=cfg.algorithm.n_timesteps,
         epsilon=1.0,
     )
-    acq_remote_agent.seed(cfg.algorithm.env_seed)
+    acq_remote_agent.seed(seed)
 
     # == Setting up the training agents
     train_temporal_q_agent = TemporalAgent(q_agent)
@@ -88,9 +89,19 @@ def run_dqn(cfg,q,n,num_agents):
     optimizer = get_class(cfg.algorithm.optimizer)(
         q_agent.parameters(), **optimizer_args
     )
+    optimizer_t = get_class(cfg.algorithm.optimizer)(
+        train_temporal_q_agent.parameters(), **optimizer_args
+    )
+
     iteration = 0
-    num_gradient = 30000 * num_agents
+    num_gradient = 8000 * num_agents
     count = 0
+    c = 0.0
+    #optimizer.zero_grad()
+    gradient = [0 for i in range(pnum)]
+    #for p in q_agent.parameters():
+    #    #print(p.grad)
+    #    gradient.append(p.grad)
     for epoch in range(cfg.algorithm.max_epoch):
         epsilon = epsilon_by_epoch(epoch)
         logger.add_scalar("monitor/epsilon", epsilon, iteration)
@@ -111,6 +122,7 @@ def run_dqn(cfg,q,n,num_agents):
         creward = creward[done]
         if creward.size()[0] > 0:
             logger.add_scalar("monitor/reward", creward.mean().item(), epoch)
+            print("reward " + str(creward.mean().item()) + " " + str(epoch))
 
         logger.add_scalar("monitor/replay_buffer_size", replay_buffer.size(), epoch)
 
@@ -160,36 +172,93 @@ def run_dqn(cfg,q,n,num_agents):
 
             optimizer.zero_grad()
             loss.backward()
+            #if cfg.algorithm.clip_grad > 0:
+            #    n = torch.nn.utils.clip_grad_norm_(
+            #        q_agent.parameters(), cfg.algorithm.clip_grad
+            #    )
+            #    logger.add_scalar("monitor/grad_norm", n.item(), iteration)
+            #optimizer.step()
 
-            if epoch < 20000:
+            if epoch <  3000:
+                if cfg.algorithm.clip_grad > 0:
+                    n = torch.nn.utils.clip_grad_norm_(
+                        q_agent.parameters(), cfg.algorithm.clip_grad
+                    )
+                    logger.add_scalar("monitor/grad_norm", n.item(), iteration)
                 optimizer.step()
             else:
-                gradient = []
-                for p in q_agent.parameters():
-                    gradient.append(p.grad)
-
-                for i in range(num_agents):
-                    q[i].put(gradient)
-                if epoch % 100 == 99:
-                    optimizer.zero_grad()
-                    c = 0.0
-                    while not q[n].empty() and c < 100:
-                        g = q[n].get()
-                        c += 1
-                        count += 1
-                        print("Get!")
-                        i = 0
-                        for p in q_agent.parameters():
-                            p.grad += g[i]
-                            i += 1
+                #gradient_tmp = []
+                #for p in q_agent.parameters():
+                #    #print(p.grad)
+                #    gradient_tmp.append(p.grad)
+                #gradient.append(index)
+ 
+                #gradient = np.asarray(gradient, dtype=np.float64)
+                #for i in range(num_agents):
+                #print("before send")
+                #queue1.send(gradient_tmp)
+                if epoch % 1000 == 999:
+                    i = 0
                     for p in q_agent.parameters():
-                        p.grad = p.grad / c
+                        p.grad += gradient[i]
+                        i += 1
+                    for p in q_agent.parameters():
+                        #print(p.grad)
+                        p.grad = p.grad / (c+1000.0)
+                    c = 0.0
                     if cfg.algorithm.clip_grad > 0:
                         n = torch.nn.utils.clip_grad_norm_(
                             q_agent.parameters(), cfg.algorithm.clip_grad
                         )
                         logger.add_scalar("monitor/grad_norm", n.item(), iteration)
                     optimizer.step()
+                if epoch % 1 == 0:
+                    #optimizer.zero_grad()
+                    #optimizer_t.zero_grad()
+                    #c = 0.0
+                    if epoch % 1000 == 0:
+                        i = 0
+                        for p in q_agent.parameters():
+                            gradient[i] = p.grad
+                            i += 1
+                    else:
+                        i = 0
+                        for p in q_agent.parameters():
+                            gradient[i] += p.grad
+                            i += 1
+                    while queue.poll() and c < 5000:
+                        #print("before recv")
+                        g = queue.recv()
+                        #print(g)
+                        c += 1
+                        count += 1
+                        #print("Get!")
+                        i = 0
+                        for gra in gradient:
+                            gra += g[i]
+                            i += 1
+                gradient_tmp = []
+                for p in q_agent.parameters():
+                    #print(p.grad)
+                    gradient_tmp.append(p.grad)
+                #gradient.append(index)
+
+                #gradient = np.asarray(gradient, dtype=np.float64)
+                #for i in range(num_agents):
+                #print("before send")
+                queue.send(gradient_tmp)
+
+                    #if c > 0:              
+                    #    for p in q_agent.parameters():
+                    #        #print(p.grad)
+                    #        p.grad = p.grad / c
+                    
+                    #    if cfg.algorithm.clip_grad > 0:
+                    #        n = torch.nn.utils.clip_grad_norm_(
+                    #            q_agent.parameters(), cfg.algorithm.clip_grad
+                    #        )
+                    #        logger.add_scalar("monitor/grad_norm", n.item(), iteration)
+                    #    optimizer.step()
 
 #            if cfg.algorithm.clip_grad > 0:
 #                n = torch.nn.utils.clip_grad_norm_(
@@ -208,13 +277,13 @@ def run_dqn(cfg,q,n,num_agents):
             soft_update_params(q_agent, q_target_agent, tau)
 
     while count < num_gradient:
-        g = q[n].get()
+        g = queue[index].get()
         count += 1
         print(count)
 
 @hydra.main(config_path=".", config_name="gym.yaml")
 def main(cfg):
-    import torch.multiprocessing as mp
+    import multiprocessing as mp
 
     mp.set_start_method("spawn")
     #logger = instantiate_class(cfg.logger)
@@ -222,12 +291,19 @@ def main(cfg):
     num_agents = 2
 
     #q_agent = instantiate_class(cfg.q_agent)
+ 
+    parent_conn_1, child_conn_1 = mp.Pipe()        
+    parent_conn_2, child_conn_2 = mp.Pipe()
     q = []
+    q.append(parent_conn_1)
+    #q.append(parent_conn_2)
+    #q.append(child_conn_2)
+    q.append(child_conn_1)
     p = []
+    #for i in range(num_agents):
+    #    q.append(mp.Queue())
     for i in range(num_agents):
-        q.append(mp.Queue())
-    for i in range(num_agents):
-        p.append(mp.Process(target=run_dqn, args=(cfg,q,i,num_agents,)))
+        p.append(mp.Process(target=run_dqn, args=(cfg,q[i],i,num_agents,432,)))
         p[i].start()
     print("start to join")
     for i in range(num_agents):
